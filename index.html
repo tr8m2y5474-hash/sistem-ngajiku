@@ -4,10 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Sistem Ngajiku</title>
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- React & ReactDOM (UMD Production) -->
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel untuk JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     body { font-family: system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
@@ -17,8 +21,11 @@
 </head>
 <body class="bg-slate-100 text-slate-800">
   <div id="root"></div>
+
   <script type="text/babel">
     const { useState, useEffect } = React;
+
+    // FontAwesome Icon Mapper
     const AppIcon = ({ name, size=20, className="" }) => {
       const map = {
         BookOpen: "fa-book-open", Users: "fa-users", CreditCard: "fa-credit-card",
@@ -31,6 +38,7 @@
       };
       return <i className={`fa-solid ${map[name] || 'fa-circle'} ${className}`} style={{fontSize: size}}></i>;
     };
+
     const iconNames = ['BookOpen','Users','CreditCard','LayoutDashboard','Settings','Plus','Edit2','Save','X','RefreshCw','AlertCircle','LogOut','ChevronRight','Menu','Star','Calendar','FileText','CheckCircle','Clock'];
     const Icons = {};
     iconNames.forEach(name => { Icons[name] = (props) => <AppIcon name={name} {...props} /> });
@@ -38,10 +46,7 @@
 
     function NgajikuApp() {
       const [session, setSession] = useState(null); 
-      // ======================================================================
-      // LETAK URL GOOGLE APPS SCRIPT ANDA DALAM TANDA KATA DI BAWAH INI
-      // (Supaya tak perlu taip manual lagi setiap kali buka website!)
-      // ======================================================================
+      // Sila masukkan URL Apps Script anda di dalam tanda petik di bawah ini secara kekal:
       const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbyFHJBDuNn1DamdWzeGzgN9fYKVG8Gc09k_odRq1Dq0WK9oxLrSLdoJhmcbbTpJktNX5g/exec"; 
 
       const [apiUrl, setApiUrl] = useState(localStorage.getItem('ngajiku_api') || DEFAULT_API_URL);
@@ -51,7 +56,9 @@
       const [loading, setLoading] = useState(false);
       const [notification, setNotification] = useState({ show: false, message: '', type: '' });
 
-      useEffect(() => { if (session && apiUrl) fetchApiData(); }, [session, apiUrl]);
+      useEffect(() => { 
+        if (session && apiUrl) fetchApiData(); 
+      }, [session, apiUrl]);
 
       const showNotification = (message, type = 'success') => {
         setNotification({ show: true, message, type });
@@ -85,10 +92,14 @@
                fetchedSchedules = fetchedSchedules.filter(sch => String(sch.student_id) === sId || sch.student_id === 'ALL');
             }
             setData({ students: fetchedStudents, records: fetchedRecords, fees: fetchedFees, notes: fetchedNotes, schedules: fetchedSchedules });
-          } else showNotification(result.message || 'Gagal memuat turun data', 'error');
+          } else {
+            showNotification(result.message || 'Gagal memuat turun data', 'error');
+          }
         } catch (err) {
           showNotification('Ralat pelayan.', 'error');
-        } finally { setLoading(false); }
+        } finally { 
+          setLoading(false); 
+        }
       };
 
       const syncData = async (action, payloadData, sheetName) => {
@@ -100,11 +111,19 @@
             body: JSON.stringify({ action: action, sheet: sheetName, data: payloadData }) 
           });
           const result = await res.json();
-          if (result.success) { showNotification(result.message); await fetchApiData(); return true; }
-          else { showNotification(result.message, 'error'); return false; }
+          if (result.success) { 
+            showNotification(result.message); 
+            await fetchApiData(); 
+            return true; 
+          } else { 
+            showNotification(result.message, 'error'); 
+            return false; 
+          }
         } catch (err) {
           showNotification('Ralat menyimpan data.', 'error'); return false;
-        } finally { setLoading(false); }
+        } finally { 
+          setLoading(false); 
+        }
       };
 
       const handleLogin = async (username, password) => {
@@ -124,11 +143,14 @@
             setSession({ user: result.user }); 
             localStorage.setItem('ngajiku_api', activeUrl);
             showNotification(`Selamat datang, ${result.user.username}`); 
+          } else {
+            showNotification(result.message, 'error');
           }
-          else showNotification(result.message, 'error');
         } catch (err) {
           showNotification('Ralat log masuk. Sila semak URL API.', 'error');
-        } finally { setLoading(false); }
+        } finally { 
+          setLoading(false); 
+        }
       };
 
       if (!session) return <LoginScreen onLogin={handleLogin} loading={loading} apiUrl={apiUrl} setApiUrl={setApiUrl} />;
@@ -153,6 +175,7 @@
               {isGuru && <NavItem id="students" icon={Users} label="Profil Pelajar" />}
               <NavItem id="records" icon={FileText} label="Rekod Kelas" />
               <NavItem id="schedules" icon={Calendar} label="Jadual Kelas" />
+              <NavItem id="notes" icon={BookOpen} label="Nota Tajwid" />
               <NavItem id="fees" icon={CreditCard} label="Kewangan / Yuran" />
             </nav>
             <div className="p-4 border-t border-emerald-800">
@@ -174,4 +197,277 @@
               {activeTab === 'students' && isGuru && <StudentManager data={data} onSave={d => syncData(d.isNew?'addRecord':'updateRecord', d, 'students')} />}
               {activeTab === 'records' && <RecordManager data={data} isGuru={isGuru} onSave={d => syncData(d.isNew?'addRecord':'updateRecord', d, 'records')} />}
               {activeTab === 'schedules' && <ScheduleManager data={data} isGuru={isGuru} onSave={d => syncData(d.isNew?'addRecord':'updateRecord', d, 'schedules')} />}
-     
+              {activeTab === 'notes' && <NoteManager data={data} isGuru={isGuru} onSave={d => syncData(d.isNew?'addRecord':'updateRecord', d, 'notes')} />}
+              {activeTab === 'fees' && <FeeManager data={data} isGuru={isGuru} onSave={d => syncData(d.isNew?'addRecord':'updateRecord', d, 'fees')} />}
+              {activeTab === 'settings' && isGuru && <SettingsManager apiUrl={apiUrl} setApiUrl={setApiUrl} showNotification={showNotification} />}
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    function LoginScreen({ onLogin, loading, apiUrl, setApiUrl }) {
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+            <div className="text-center mb-8">
+              <div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 text-emerald-600"><BookOpen size={32} /></div>
+              <h1 className="text-2xl font-bold text-slate-800">Sistem Ngajiku</h1>
+              <p className="text-slate-500 text-sm mt-1">Log masuk untuk meneruskan</p>
+            </div>
+            <form onSubmit={(e) => { e.preventDefault(); onLogin(e.target.u.value, e.target.p.value); }} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">ID Pengguna / Username</label>
+                <input required name="u" className="w-full p-3 border border-slate-300 rounded-lg outline-none focus:border-emerald-500" placeholder="Cth: admin" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Katalaluan</label>
+                <input required type="password" name="p" className="w-full p-3 border border-slate-300 rounded-lg outline-none focus:border-emerald-500" placeholder="••••••••" />
+              </div>
+              <button type="submit" disabled={loading} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold shadow-md active:scale-95 transition-transform disabled:opacity-50">
+                {loading ? 'Mengesahkan...' : 'Log Masuk'}
+              </button>
+            </form>
+          </div>
+        </div>
+      );
+    }
+
+    function StarRating({ rating, setRating, readOnly }) {
+      return (
+        <div className="flex space-x-1">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <i key={star} onClick={() => !readOnly && setRating && setRating(star)} className={`fa-solid fa-star text-xl ${readOnly ? '' : 'cursor-pointer'} ${star <= rating ? 'text-amber-400' : 'text-slate-200'}`}></i>
+          ))}
+        </div>
+      );
+    }
+
+    function Modal({ title, onClose, children }) {
+      return (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b flex justify-between items-center bg-slate-50 rounded-t-xl">
+              <h3 className="font-bold text-lg text-slate-800">{title}</h3>
+              <button onClick={onClose} className="p-2 bg-white rounded-md shadow-sm text-red-500"><X size={18}/></button>
+            </div>
+            <div className="p-5 overflow-y-auto">{children}</div>
+          </div>
+        </div>
+      );
+    }
+
+    function GuruDashboard({ data, setTab }) {
+      const today = new Date().toISOString().split('T')[0];
+      const todayClasses = data.schedules.filter(s => s.date === today);
+      const totalFees = data.fees.filter(f=>f.status==='Telah Bayar').reduce((acc, c) => acc + (Number(c.amount) || 0), 0);
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[{t:'Pelajar Aktif',v:data.students.length,i:Users,c:'text-blue-500 bg-blue-100'},
+              {t:'Kelas Hari Ini',v:todayClasses.length,i:Calendar,c:'text-purple-500 bg-purple-100'},
+              {t:'Total Rekod',v:data.records.length,i:FileText,c:'text-emerald-500 bg-emerald-100'},
+              {t:'Yuran Terkumpul',v:`RM ${totalFees}`,i:CreditCard,c:'text-amber-500 bg-amber-100'}
+             ].map((s,i) => (
+               <div key={i} className="bg-white p-4 rounded-xl shadow-sm flex flex-col justify-center items-center text-center space-y-2 border border-slate-100">
+                 <div className={`p-3 rounded-full ${s.c}`}><s.i size={24}/></div>
+                 <div><p className="text-xs text-slate-500 font-medium">{s.t}</p><p className="text-lg font-bold">{s.v}</p></div>
+               </div>
+             ))}
+          </div>
+        </div>
+      );
+    }
+
+    function StudentDashboard({ data }) {
+      const latest = data.records.sort((a,b) => new Date(b.date) - new Date(a.date))[0];
+      return (
+        <div className="space-y-4 max-w-4xl mx-auto">
+          <div className="bg-emerald-800 rounded-2xl p-6 text-white shadow flex flex-col justify-center min-h-[160px]">
+            <h2 className="text-xl font-bold mb-1">Prestasi Semasa Anda</h2>
+            {latest ? (
+              <div className="space-y-2 mt-2">
+                <p>Sedang Belajar: <span className="bg-emerald-600 px-2 py-1 rounded font-bold text-sm ml-1">{latest.surah || '-'} (M/S {latest.page || '-'})</span></p>
+                <p>Penguasaan: <span className="text-amber-300 font-bold ml-1">{latest.progress_status}</span></p>
+              </div>
+            ) : <p className="text-emerald-200 text-sm mt-2">Tiada rekod bacaan dijumpai. Teruskan usaha!</p>}
+          </div>
+          <div className="bg-white p-5 rounded-xl shadow-sm border">
+            <h3 className="font-bold text-slate-700 mb-3 border-b pb-2"><Star className="inline mr-2 text-amber-500"/>Penilaian Terakhir</h3>
+            {latest ? (
+              <div><StarRating rating={Number(latest.prestasi)||0} readOnly /><p className="mt-3 text-sm italic text-slate-600 bg-slate-50 p-3 rounded-lg border">"{latest.note || 'Tiada catatan guru.'}"</p></div>
+            ) : <p className="text-sm text-slate-500">Belum ada penilaian.</p>}
+          </div>
+        </div>
+      );
+    }
+
+    function StudentManager({ data, onSave }) {
+      const [edit, setEdit] = useState(null);
+      return (
+        <div className="bg-white rounded-xl shadow-sm border">
+          <div className="p-4 border-b flex justify-between bg-slate-50 rounded-t-xl"><h3 className="font-bold">Direktori Pelajar</h3><button onClick={()=>setEdit({})} className="bg-emerald-600 text-white px-3 py-1.5 text-sm rounded shadow"><Plus className="inline mr-1"/> Baru</button></div>
+          <div className="divide-y max-h-[65vh] overflow-y-auto">
+            {data.students.map(s => (
+              <div key={s.id} className="p-4 flex justify-between items-center hover:bg-slate-50">
+                <div><p className="font-bold">{s.name}</p><p className="text-xs text-slate-500">{s.id} • {s.program} • <span className={s.status==='Aktif'?'text-emerald-600 font-bold':'text-red-500'}>{s.status}</span></p></div>
+                <button onClick={()=>setEdit(s)} className="p-2 text-slate-400 hover:text-emerald-600 bg-slate-100 rounded"><Edit2 size={16}/></button>
+              </div>
+            ))}
+          </div>
+          {edit && <Modal title="Profil Pelajar" onClose={()=>setEdit(null)}>
+            <form onSubmit={e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.id = edit.id||`ST${Date.now()}`; f.isNew = !edit.id; onSave(f); setEdit(null); }} className="space-y-4">
+              <input name="name" defaultValue={edit.name} placeholder="Nama Penuh" required className="w-full p-3 border rounded-lg" />
+              <input name="phone" defaultValue={edit.phone} placeholder="No Telefon" className="w-full p-3 border rounded-lg" />
+              <select name="program" defaultValue={edit.program||'Iqra'} className="w-full p-3 border rounded-lg"><option>Iqra</option><option>Al-Quran</option><option>Hafazan</option></select>
+              <select name="status" defaultValue={edit.status||'Aktif'} className="w-full p-3 border rounded-lg"><option>Aktif</option><option>Tidak Aktif</option></select>
+              <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold">Simpan</button>
+            </form>
+          </Modal>}
+        </div>
+      );
+    }
+
+    function RecordManager({ data, isGuru, onSave }) {
+      const [edit, setEdit] = useState(null);
+      const [rating, setRating] = useState(0);
+      return (
+        <div className="bg-white rounded-xl shadow-sm border">
+          <div className="p-4 border-b flex justify-between bg-slate-50 rounded-t-xl"><h3 className="font-bold">Rekod Kelas</h3>
+            {isGuru && <button onClick={()=>{setEdit({}); setRating(0);}} className="bg-emerald-600 text-white px-3 py-1.5 text-sm rounded shadow"><Plus className="inline mr-1"/> Rekod</button>}
+          </div>
+          <div className="divide-y max-h-[65vh] overflow-y-auto">
+            {data.records.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(r => {
+              const s = data.students.find(x => String(x.id) === String(r.student_id));
+              return (
+                <div key={r.id} className="p-4 hover:bg-slate-50 flex justify-between items-start">
+                  <div>
+                    <p className="font-bold text-sm mb-1">{r.date} <span className="text-slate-400 font-normal ml-2">{s?.name||'-'}</span></p>
+                    <p className="text-emerald-700 font-semibold text-sm bg-emerald-50 inline-block px-2 py-0.5 rounded border border-emerald-100">{r.surah||'-'} (ms: {r.page||'-'})</p>
+                    <p className="text-xs text-slate-500 mt-1">{r.progress_status} • Kehadiran: <span className="font-bold">{r.kehadiran}</span></p>
+                  </div>
+                  {isGuru && <button onClick={()=>{setEdit(r); setRating(Number(r.prestasi)||0);}} className="p-2 text-slate-400 hover:text-emerald-600 bg-slate-100 rounded ml-2"><Edit2 size={16}/></button>}
+                </div>
+              );
+            })}
+          </div>
+          {edit && <Modal title="Rekod Kelas" onClose={()=>setEdit(null)}>
+            <form onSubmit={e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.id = edit.id||`R${Date.now()}`; f.isNew = !edit.id; f.prestasi = rating; onSave(f); setEdit(null); }} className="space-y-4">
+              <input type="date" name="date" defaultValue={edit.date||new Date().toISOString().split('T')[0]} required className="w-full p-3 border rounded-lg" />
+              <select name="student_id" defaultValue={edit.student_id} required className="w-full p-3 border rounded-lg bg-slate-50"><option value="">-- Pilih Pelajar --</option>{data.students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+              <div className="flex gap-2">
+                <input name="surah" defaultValue={edit.surah} placeholder="Surah/Buku" required className="w-full p-3 border rounded-lg" />
+                <input name="page" defaultValue={edit.page} placeholder="M/S" className="w-24 p-3 border rounded-lg" />
+              </div>
+              <select name="progress_status" defaultValue={edit.progress_status||'Diperkenalkan'} className="w-full p-3 border rounded-lg"><option>Belum Dipelajari</option><option>Diperkenalkan</option><option>Sedang Dikuasai</option><option>Perlu Ulang</option><option>Dikuasai</option></select>
+              <select name="kehadiran" defaultValue={edit.kehadiran||'Hadir'} className="w-full p-3 border rounded-lg"><option>Hadir</option><option>Lewat</option><option>Tidak Hadir</option></select>
+              <div className="pt-2"><label className="block text-sm mb-2 text-slate-500 font-bold">Penilaian Bacaan</label><StarRating rating={rating} setRating={setRating} /></div>
+              <textarea name="note" defaultValue={edit.note} placeholder="Catatan guru..." rows="2" className="w-full p-3 border rounded-lg mt-2"></textarea>
+              <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold">Simpan Rekod</button>
+            </form>
+          </Modal>}
+        </div>
+      );
+    }
+
+    function ScheduleManager({ data, isGuru, onSave }) {
+      const [edit, setEdit] = useState(null);
+      return (
+        <div className="bg-white rounded-xl shadow-sm border">
+          <div className="p-4 border-b flex justify-between bg-slate-50 rounded-t-xl"><h3 className="font-bold">Jadual Kelas</h3>{isGuru && <button onClick={()=>setEdit({})} className="bg-emerald-600 text-white px-3 py-1.5 text-sm rounded shadow"><Plus className="inline mr-1"/> Jadual</button>}</div>
+          <div className="divide-y max-h-[65vh] overflow-y-auto p-4 space-y-3">
+            {data.schedules.map(sch => {
+              const s = data.students.find(x => String(x.id) === String(sch.student_id));
+              return (
+                <div key={sch.id} className="p-4 border rounded-xl bg-white flex justify-between items-center shadow-sm">
+                  <div><p className="font-bold">{sch.date} @ {sch.time}</p><p className="text-sm text-slate-600">{s?.name || 'Semua Pelajar'}</p><span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-medium mt-1 inline-block">{sch.status}</span></div>
+                  {isGuru && <button onClick={()=>setEdit(sch)} className="p-2 bg-slate-100 rounded"><Edit2 size={16}/></button>}
+                </div>
+              );
+            })}
+          </div>
+          {edit && <Modal title="Jadual Kelas" onClose={()=>setEdit(null)}>
+            <form onSubmit={e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.id = edit.id||`SCH${Date.now()}`; f.isNew = !edit.id; onSave(f); setEdit(null); }} className="space-y-4">
+              <input type="date" name="date" defaultValue={edit.date} required className="w-full p-3 border rounded-lg" />
+              <input type="time" name="time" defaultValue={edit.time} required className="w-full p-3 border rounded-lg" />
+              <select name="student_id" defaultValue={edit.student_id} className="w-full p-3 border rounded-lg"><option value="ALL">Semua Pelajar</option>{data.students.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
+              <select name="status" defaultValue={edit.status||'Dijadualkan'} className="w-full p-3 border rounded-lg"><option>Dijadualkan</option><option>Selesai</option><option>Batal</option></select>
+              <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold">Simpan Jadual</button>
+            </form>
+          </Modal>}
+        </div>
+      );
+    }
+
+    function NoteManager({ data, isGuru, onSave }) {
+      const [edit, setEdit] = useState(null);
+      return (
+        <div className="bg-white rounded-xl shadow-sm border">
+          <div className="p-4 border-b flex justify-between bg-slate-50 rounded-t-xl"><h3 className="font-bold">Nota Tajwid</h3>{isGuru && <button onClick={()=>setEdit({})} className="bg-emerald-600 text-white px-3 py-1.5 text-sm rounded shadow"><Plus className="inline mr-1"/> Nota</button>}</div>
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            {data.notes.map(n => (
+              <div key={n.id} className="p-4 border rounded-xl bg-amber-50/40 relative">
+                <h4 className="font-bold text-lg">{n.topic}</h4>
+                <p className="text-sm text-slate-600 mt-2 whitespace-pre-wrap">{n.content}</p>
+                {isGuru && <button onClick={()=>setEdit(n)} className="absolute top-4 right-4 text-slate-400 hover:text-emerald-600"><Edit2 size={16}/></button>}
+              </div>
+            ))}
+          </div>
+          {edit && <Modal title="Nota Tajwid" onClose={()=>setEdit(null)}>
+            <form onSubmit={e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.id = edit.id||`N${Date.now()}`; f.isNew = !edit.id; f.date = new Date().toISOString().split('T')[0]; onSave(f); setEdit(null); }} className="space-y-4">
+              <input name="topic" defaultValue={edit.topic} placeholder="Topik" required className="w-full p-3 border rounded-lg" />
+              <textarea name="content" defaultValue={edit.content} rows="5" placeholder="Kandungan nota..." required className="w-full p-3 border rounded-lg"></textarea>
+              <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold">Simpan Nota</button>
+            </form>
+          </Modal>}
+        </div>
+      );
+    }
+
+    function FeeManager({ data, isGuru, onSave }) {
+      const [edit, setEdit] = useState(null);
+      return (
+        <div className="bg-white rounded-xl shadow-sm border">
+          <div className="p-4 border-b flex justify-between bg-slate-50 rounded-t-xl"><h3 className="font-bold">Yuran & Kewangan</h3>{isGuru && <button onClick={()=>setEdit({})} className="bg-emerald-600 text-white px-3 py-1.5 text-sm rounded shadow"><Plus className="inline mr-1"/> Yuran</button>}</div>
+          <div className="divide-y max-h-[65vh] overflow-y-auto">
+            {data.fees.map(f => {
+              const s = data.students.find(x => String(x.id) === String(f.student_id));
+              return (
+                <div key={f.id} className="p-4 flex justify-between items-center hover:bg-slate-50">
+                  <div><p className="font-bold">{f.month} - {s?.name || '-'}</p><p className="text-xs text-slate-500">Resit: {f.receipt_no || '-'} • RM {f.amount}</p></div>
+                  <div className="flex items-center space-x-3"><span className={`px-2 py-1 text-xs font-bold rounded ${f.status==='Telah Bayar'?'bg-emerald-100 text-emerald-800':'bg-red-100 text-red-800'}`}>{f.status}</span>{isGuru && <button onClick={()=>setEdit(f)} className="p-2 bg-slate-100 rounded"><Edit2 size={16}/></button>}</div>
+                </div>
+              );
+            })}
+          </div>
+          {edit && <Modal title="Kewangan Yuran" onClose={()=>setEdit(null)}>
+            <form onSubmit={e => { e.preventDefault(); const f = Object.fromEntries(new FormData(e.target)); f.id = edit.id||`F${Date.now()}`; f.isNew = !edit.id; onSave(f); setEdit(null); }} className="space-y-4">
+              <select name="student_id" defaultValue={edit.student_id} required className="w-full p-3 border rounded-lg"><option value="">-- Pilih Pelajar --</option>{data.students.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select>
+              <input type="month" name="month" defaultValue={edit.month} required className="w-full p-3 border rounded-lg" />
+              <input type="number" step="0.01" name="amount" defaultValue={edit.amount} placeholder="Jumlah (RM)" required className="w-full p-3 border rounded-lg" />
+              <input name="package_name" defaultValue={edit.package_name||'Yuran Bulanan'} placeholder="Nama Pakej" className="w-full p-3 border rounded-lg" />
+              <input name="receipt_no" defaultValue={edit.receipt_no} placeholder="No Resit" className="w-full p-3 border rounded-lg" />
+              <select name="status" defaultValue={edit.status||'Belum Bayar'} className="w-full p-3 border rounded-lg"><option>Belum Bayar</option><option>Telah Bayar</option></select>
+              <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold">Simpan Kewangan</button>
+            </form>
+          </Modal>}
+        </div>
+      );
+    }
+
+    function SettingsManager({ apiUrl, setApiUrl, showNotification }) {
+      const [url, setUrl] = useState(apiUrl);
+      return (
+        <div className="max-w-xl bg-white p-6 rounded-xl shadow-sm border">
+          <h3 className="font-bold text-lg mb-2">Tetapan Pautan API</h3>
+          <p className="text-sm text-slate-500 mb-4">Pautan Google Apps Script Web App.</p>
+          <input type="text" value={url} onChange={e=>setUrl(e.target.value)} className="w-full p-3 border rounded-lg mb-4 text-sm" />
+          <button onClick={() => { setApiUrl(url); localStorage.setItem('ngajiku_api', url); showNotification('URL berjaya disimpan!'); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-bold">Simpan URL</button>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<NgajikuApp />);
+  </script>
+</body>
+</html>
