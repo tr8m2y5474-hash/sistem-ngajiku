@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Sistem Ngajiku</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React & Babel -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  
+  <!-- FontAwesome (Pengganti Lucide untuk versi ringan) -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; -webkit-tap-highlight-color: transparent; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // ======================================================================
+    // MASUKKAN URL GOOGLE APPS SCRIPT (WEB APP) ANDA DI BAWAH INI
+    // ======================================================================
+    const DEFAULT_API_URL = "LETAK_URL_ANDA_DI_SINI"; 
+
+    // Sistem Ikon Ringan
+    const AppIcon = ({ name, size=20, className="" }) => {
+      const map = {
+        BookOpen: "fa-book-open", Users: "fa-users", CreditCard: "fa-credit-card",
+        LayoutDashboard: "fa-border-all", Settings: "fa-cog", Plus: "fa-plus",
+        Edit2: "fa-pen-to-square", Save: "fa-save", X: "fa-xmark",
+        RefreshCw: "fa-arrows-rotate", AlertCircle: "fa-circle-exclamation",
+        LogOut: "fa-right-from-bracket", ChevronRight: "fa-chevron-right",
+        Menu: "fa-bars", Star: "fa-star", Calendar: "fa-calendar-days",
+        FileText: "fa-file-lines", CheckCircle: "fa-circle-check", Clock: "fa-clock"
+      };
+      return <i className={`fa-solid ${map[name] || 'fa-circle'} ${className}`} style={{fontSize: size}}></i>;
+    };
+
+    const iconNames = ['BookOpen','Users','CreditCard','LayoutDashboard','Settings','Plus','Edit2','Save','X','RefreshCw','AlertCircle','LogOut','ChevronRight','Menu','Star','Calendar','FileText','CheckCircle','Clock'];
+    const Icons = {};
+    iconNames.forEach(name => { Icons[name] = (props) => <AppIcon name={name} {...props} /> });
+    const { BookOpen, Users, CreditCard, LayoutDashboard, Settings, Plus, Edit2, Save, X, RefreshCw, AlertCircle, LogOut, ChevronRight, Menu, Star, Calendar, FileText, CheckCircle, Clock } = Icons;
+
+    function NgajikuApp() {
+      const [session, setSession] = useState(null); 
+      
+      const getInitialUrl = () => {
+        let savedUrl = localStorage.getItem('ngajiku_api') || DEFAULT_API_URL;
+        if (savedUrl.endsWith('$0')) {
+          savedUrl = savedUrl.replace('$0', '');
+          localStorage.setItem('ngajiku_api', savedUrl);
+        }
+        return savedUrl;
+      };
+
+      const [apiUrl, setApiUrl] = useState(getInitialUrl());
+      const [activeTab, setActiveTab] = useState('dashboard');
+      const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+      const [data, setData] = useState({ students: [], records: [], fees: [], notes: [], schedules: [] });
+      const [loading, setLoading] = useState(false);
+      const [notification, setNotification] = useState({ show: false, message: '', type: '' });
+
+      useEffect(() => { if (session && apiUrl) fetchApiData(); }, [session, apiUrl]);
+
+      const showNotification = (message, type = 'success') => {
+        setNotification({ show: true, message, type });
+        setTimeout(() => setNotification({ show: false, message: '', type: '' }), 4000);
+      };
+
+      const fetchApiData = async () => {
+        if (!apiUrl || apiUrl === "LETAK_URL_ANDA_DI_SINI") {
+          showNotification("Sila masukkan URL API yang sebenar.", "error"); return;
+        }
+        setLoading(true);
+        try {
+          const res = await fetch(apiUrl, { method: 'POST', body: JSON.stringify({ action: 'getAllData', role: session.user.role, student_id: session.user.student_id }) });
+          const result = await res.json();
+          if (result.success) {
+            let fetchedStudents = result.data.students || [];
+            let fetchedRecords = result.data.records || [];
+            let fetchedFees = result.data.fees || [];
+            let fetchedSchedules = result.data.schedules || [];
+            let fetchedNotes = result.data.notes || [];
+
+            if (session.user.role === 'pelajar') {
+               const sId = String(session.user.student_id);
+               fetchedStudents = fetchedStudents.filter(s => String(s.id) === sId);
+               fetchedRecords = fetchedRecords.filter(r => String(r.student_id) === sId);
+               fetchedFees = fetchedFees.filter(f => String(f.student_id) === sId);
+               fetchedSchedules = fetchedSchedules.filter(sch => String(sch.student_id) === sId || sch.student_id === 'ALL');
+            }
+            setData({ students: fetchedStudents, records: fetchedRecords, fees: fetchedFees, notes: fetchedNotes, schedules: fetchedSchedules });
+          } else showNotification(result.message || 'Gagal memuat turun data', 'error');
+        } catch (err) {
+          showNotification('Ralat pelayan. Semak URL Web App.', 'error');
+        } finally { setLoading(false); }
+      };
+
+      const syncData = async (action, payloadData, sheetName) => {
+        setLoading(true);
+        try {
+          const res = await fetch(apiUrl, { method: 'POST', body: JSON.stringify({ action: action, sheet: sheetName, data: payloadData }) });
+          const result = await res.json();
+          if (result.success) { showNotification(result.message); await fetchApiData(); return true; }
+          else { showNotification(result.message, 'error'); return false; }
+        } catch (err) {
+          showNotification('Ralat menyimpan data.', 'error'); return false;
+        } finally { setLoading(false); }
+      };
+
+      const handleLogin = async (username, password) => {
+        if (!apiUrl || apiUrl === "LETAK_URL_ANDA_DI_SINI") {
+          showNotification('Sila masukkan URL API terlebih dahulu.', 'error'); return;
+        }
+        setLoading(true);
+        try {
+          const cleanUrl = apiUrl.endsWith('$0') ? apiUrl.replace('$0', '') : apiUrl;
+          const res = await fetch(cleanUrl, { method: 'POST', body: JSON.stringify({ action: 'login', username, password }) });
+          let result;
+          try { result = await res.json(); } catch (e) { throw new Error("URL API tidak sah. Pastikan anda buat 'New Deployment' > 'Anyone'."); }
+          if (result.success) { setSession({ user: result.user }); showNotification(`Selamat datang, ${result.user.username}`); }
+          else showNotification(result.message, 'error');
+        } catch (err) {
+          showNotification(err.message, 'error');
+        } finally { setLoading(false); }
+      };
+
+      if (!session) return <LoginScreen onLogin={handleLogin} loading={loading} apiUrl={apiUrl} setApiUrl={setApiUrl} />;
+      const isGuru = session.user.role === 'guru';
+
+      const NavItem = ({ id, icon: Icon, label }) => (
+        <button onClick={() => { setActiveTab(id); setIsMobileMenuOpen(false); }} className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${activeTab === id ? 'bg-emerald-600 text-white shadow' : 'text-emerald-100 hover:bg-emerald-700/50'}`}>
+          <Icon size={20} /> <span className="font-medium">{label}</span>
+        </button>
+      );
+
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+          <div className="md:hidden bg-emerald-900 text-white p-4 flex justify-between items-center shadow-md z-20">
+            <div className="flex items-center space-x-2"><BookOpen className="text-emerald-400" size={24} /><h1 className="text-lg font-bold">Ngajiku</h1></div>
+            <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>{isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</button>
+          </div>
+          <aside className={`${isMobileMenuOpen ? 'block' : 'hidden'} md:flex flex-col w-full md:w-64 bg-emerald-900 shadow-xl absolute md:relative z-10 min-h-screen`}>
+            <div className="hidden md:flex p-6 items-center justify-center border-b border-emerald-800 text-white"><BookOpen className="text-emerald-400 mr-2" size={28} /><h1 className="text-xl font-bold">Ngajiku</h1></div>
+            <nav className="flex-1 p-4 flex flex-col space-y-2 mt-2 md:mt-0">
+              <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
+              {isGuru && <NavItem id="students" icon={Users} label="Profil Pelajar" />}
+              <NavItem id="records" icon={FileText} label="Rekod Kelas" />
+              <NavItem id="schedules" icon={Calendar} label="Jadual Kelas" />
+              <NavItem id="fees" icon={CreditCard} label="Kewangan" />
+            </nav>
+            <div className="p-4 border-t border-emerald-800">
+              {isGuru && <NavItem id="settings" icon={Settings} label="Tetapan API" />}
+              <button onClick={() => setSession(null)} className="w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-red-300 hover:bg-red-900/30 transition mt-2"><LogOut size={20} /><span className="font-medium">Log Keluar</span></button>
+            </div>
+          </aside>
+          <main className="flex-1 flex flex-col h-screen overflow-hidden">
+            <header className="bg-white shadow-sm px-6 py-4 flex items-center justify-between z-0">
+              <h2 className="text-xl font-semibold text-gray-800 capitalize hidden md:block">{activeTab === 'dashboard' ? `Hai, ${session.user.username}` : activeTab}</h2>
+              <div className="flex items-center space-x-4">
+                {notification.show && <span className={`px-4 py-2 rounded-lg text-sm font-medium ${notification.type === 'error' ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}`}>{notification.message}</span>}
+                <button onClick={fetchApiData} disabled={loading} className="flex items-center space-x-2 bg-slate-100 text-slate-700 px-3 py-2 rounded-lg"><RefreshCw size={18} className={loading ? 'fa-spin' : ''} /><span className="hidden md:inline">Segerak</span></button>
+              </div>
+            </header>
+            <div className="flex-1 overflow-auto p-4 md:p-8 bg-slate-50 pb-24">
+              {activeTab === 'dashboard' && isGuru && <GuruDashboard data={data} setTab={setActiveTab} />}
+              {activeTab === 'dashboard' && !isGuru && <StudentDashboard data={data} />}
+              {activeTab === 'students' && isGuru && <StudentManager data={data} onSave={d => syncData(d.isNew?'addRecord':'updateRecord', d, 'students')} />}
+              {activeTab === 'records' && <RecordManager data={data} isGuru={isGuru} onSave={d => syncData(d.isNew?'addRecord':'updateRecord', d, 'records')} />}
+              {activeTab === 'schedules' && <div className="bg-white p-8 rounded-xl text-center shadow-sm text-slate-500">Gunakan tab ini untuk urus Jadual (Modul dibina selari dengan Backend)</div>}
+              {activeTab === 'fees' && <div className="bg-white p-8 rounded-xl text-center shadow-sm text-slate-500">Gunakan tab ini untuk urus Yuran (Modul dibina selari dengan Backend)</div>}
+              {activeTab === 'settings' && isGuru && (
+                <div className="max-w-xl bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                  <h3 className="text-lg font-bold text-gray-800 mb-4">Integrasi Sistem API</h3>
+                  <input type="text" value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} className="w-full p-3 border border-gray-300 rounded-lg mb-4 outline-none" />
+                  <button onClick={() => { localStorage.setItem('ngajiku_api', apiUrl); showNotification('URL API Disimpan'); }} className="bg-emerald-600 text-white px-4 py-2 rounded-lg">Simpan Secara Lokal</button>
+                </div>
+              )}
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    function LoginScreen({ onLogin, loading, apiUrl, setApiUrl }) {
+      const [showSettings, setShowSettings] = useState(!apiUrl || apiUrl === "LETAK_URL_ANDA_DI_SINI");
+      return (
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
+          <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+            <div className="text-center mb-8"><div className="bg-emerald-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"><BookOpen className="text-emerald-600" size={32} /></div><h1 className="text-2xl font-bold text-slate-800">Sistem Ngajiku</h1><p className="text-slate-500 text-sm mt-1">Sila log masuk</p></div>
+            {showSettings && (
+              <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <label className="block text-sm font-medium text-slate-700 mb-2">URL Sistem API</label>
+                <input type="text" value={apiUrl} onChange={e => setApiUrl(e.target.value)} placeholder="https://script.google.com/..." className="w-full p-2 border rounded focus:ring-emerald-500 outline-none text-sm mb-2" />
+                <button onClick={() => { localStorage.setItem('ngajiku_api', apiUrl); setShowSettings(false); }} className="w-full bg-slate-800 text-white py-2 rounded text-sm">Guna URL Ini</button>
+              </div>
+            )}
+            <form onSubmit={e => { e.preventDefault(); onLogin(e.target.u.value, e.target.p.value); }} className="space-y-4">
+              <div><label className="block text-sm font-medium text-slate-700 mb-1">ID Pengguna</label><input required name="u" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500" /></div>
+              <div><label className="block text-sm font-medium text-slate-700 mb-1">Katalaluan</label><input required type="password" name="p" className="w-full p-3 border rounded-lg outline-none focus:ring-2 focus:ring-emerald-500" /></div>
+              <button type="submit" disabled={loading} className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700 disabled:opacity-50">{loading ? 'Mengesahkan...' : 'Log Masuk'}</button>
+            </form>
+            {!showSettings && <button onClick={() => setShowSettings(true)} className="mt-6 text-sm text-slate-400 hover:text-slate-600 w-full text-center underline">Konfigurasi Sistem</button>}
+          </div>
+        </div>
+      );
+    }
+
+    function StarRating({ rating, setRating, readOnly = false }) {
+      return (
+        <div className="flex space-x-1">
+          {[1, 2, 3, 4, 5].map((star) => (
+            <button key={star} type="button" onClick={() => !readOnly && setRating && setRating(star)} className={`${readOnly ? 'cursor-default' : 'cursor-pointer'} transition-colors duration-200 focus:outline-none`}>
+              <Star size={24} className={star <= rating ? 'text-amber-400' : 'text-slate-200'} />
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    function GuruDashboard({ data, setTab }) {
+      return (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-white p-5 rounded-xl shadow-sm border"><div className="bg-blue-500 p-3 rounded-lg text-white inline-block mb-2"><Users size={24}/></div><p className="text-slate-500 text-sm">Pelajar</p><p className="text-2xl font-bold">{data.students.length}</p></div>
+            <div className="bg-white p-5 rounded-xl shadow-sm border"><div className="bg-emerald-500 p-3 rounded-lg text-white inline-block mb-2"><FileText size={24}/></div><p className="text-slate-500 text-sm">Rekod</p><p className="text-2xl font-bold">{data.records.length}</p></div>
+          </div>
+        </div>
+      );
+    }
+
+    function StudentDashboard({ data }) {
+      const latestRecord = data.records.sort((a,b) => new Date(b.date) - new Date(a.date))[0];
+      return (
+        <div className="space-y-6 max-w-5xl mx-auto">
+          <div className="bg-emerald-800 rounded-2xl p-6 md:p-10 text-white shadow-lg relative overflow-hidden">
+            <div className="relative z-10">
+              <h2 className="text-2xl font-bold mb-2">Prestasi Semasa Anda</h2>
+              {latestRecord ? (
+                <div className="text-emerald-100 space-y-1 mt-4">
+                  <p className="text-lg">Belajar: <strong className="text-white bg-emerald-700 px-3 py-1 rounded-md">{latestRecord.surah || '-'} (M/S {latestRecord.page || '-'})</strong></p>
+                  <p>Status: <span className="font-medium text-amber-300">{latestRecord.progress_status || '-'}</span></p>
+                </div>
+              ) : <p className="text-emerald-200 mt-4">Tiada rekod bacaan ditemui.</p>}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function StudentManager({ data, onSave }) { return <div className="bg-white p-8 rounded-xl shadow-sm">Modul Direktori Pelajar (Rujuk App.jsx penuh jika perlu paparan terperinci di sini)</div>; }
+    function RecordManager({ data, isGuru, onSave }) { return <div className="bg-white p-8 rounded-xl shadow-sm">Modul Rekod Kelas (Rujuk App.jsx penuh jika perlu paparan terperinci di sini)</div>; }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<NgajikuApp />);
+  </script>
+</body>
+</html>
